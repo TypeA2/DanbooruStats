@@ -23,3 +23,6 @@ target_link_libraries(DanbooruStats PRIVATE SQLiteCpp)
 
 find_package(inja CONFIG REQUIRED)
 target_link_libraries(DanbooruStats PRIVATE pantor::inja)
+
+find_package(efsw CONFIG REQUIRED)
+target_link_libraries(DanbooruStats PRIVATE efsw::efsw)
