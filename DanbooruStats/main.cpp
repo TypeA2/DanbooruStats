@@ -4,6 +4,29 @@
 
 #include "database.h"
 #include "web_server.h"
+#include "danbooru.h"
+#include "rate_limit.h"
+
+#include <fstream>
+#include <string>
+
+static void load_dotenv() {
+	std::ifstream dotenv{ ".env" };
+
+	int err;
+	for (std::string line; std::getline(dotenv, line);) {
+		if ((err = _putenv(line.c_str()) != 0)) {
+			spdlog::error("Error inserting line \"{}\"", line);
+			std::exit(EXIT_FAILURE);
+		}
+	}
+
+	spdlog::info("Loaded .env");
+}
+
+static void flush_spdlog() {
+	spdlog::default_logger()->flush();
+}
 
 int main() {
 	/* Output to stdout and a to a file */
@@ -21,20 +44,23 @@ int main() {
 	logger->set_pattern("[%Y-%m-%d %H:%M:%S.%f] [%^%l%$] [%t] %v");
 
 	spdlog::set_default_logger(logger);
+	spdlog::set_level(spdlog::level::trace);
+	atexit(flush_spdlog);
+
+	load_dotenv();
+
+	danbooru danbooru{ std::getenv("DANBOORU_LOGIN"), std::getenv("DANBOORU_API_KEY") };
 
 	database db{ "DanbooruStats.db" };
-	/*
-	httplib::Client cli("https://danbooru.donmai.us");
-	cli.set_logger([&](const httplib::Request& req, const httplib::Response& res) {
-		spdlog::info("Request: {}{}", cli.host(), req.path);
-		spdlog::info("Result: {}", res.status);
-	});
 
+	web_server server { danbooru };
 
-	auto res = cli.Get("/users/480070.json");
-	spdlog::info("{}\n{}", res->status, res->body);*/
+	try {
+		server.listen("0.0.0.0", 26980);
+	} catch (const std::runtime_error& e) {
+		spdlog::error("Fatal error: {}", e.what());
+		return EXIT_FAILURE;
+	}
 
-	web_server server;
-	server.listen("0.0.0.0", 26980);
-	return 0;
+	return EXIT_SUCCESS;
 }

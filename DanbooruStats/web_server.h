@@ -10,15 +10,20 @@
 
 #include <unordered_map>
 
+class danbooru;
 class web_server : private efsw::FileWatchListener {
     httplib::Server _server;
     std::filesystem::path _template_path;
+    std::filesystem::path _static_path;
     inja::Environment _inja;
     efsw::FileWatcher _watcher;
     efsw::WatchID _watch_id;
 
+    danbooru& _danbooru;
+
     enum class template_id {
         users,
+        request,
     };
 
     std::unordered_map<template_id, inja::Template> _template_cache;
@@ -27,23 +32,27 @@ class web_server : private efsw::FileWatchListener {
     public:
     virtual ~web_server();
 
-    explicit web_server(const std::string& template_path = "./html/");
+    explicit web_server(danbooru& danbooru, const std::string& template_path = "./html/", const std::string& static_path = "./static/");
 
     void listen(const std::string& addr, uint16_t port);
 
     protected:
     virtual void users(int64_t id, const httplib::Request& req, httplib::Response& res);
+    virtual void request(const httplib::Request& req, httplib::Response& res, inja::json data = {});
+    virtual void request_post(const httplib::Request& req, httplib::Response& res);
 
     private:
-    static constexpr std::string_view template_filename(template_id id) {
+    [[nodiscard]] static constexpr std::string_view template_filename(template_id id) {
         using enum template_id;
         switch (id) {
-            case users: return "users.html";
+            case users:   return "users.html";
+            case request: return "request.html";
+            default: return ""; /* Shouldn't happen */
         }
     }
 
-    const inja::Template& _ensure_template(template_id id);
-    std::string _make_template_path(template_id id) const;
+    [[nodiscard]] const inja::Template& _ensure_template(template_id id);
+    [[nodiscard]] std::string _make_template_path(template_id id) const;
 
     void handleFileAction(efsw::WatchID watch_id, const std::string& dir,
         const std::string& filename, efsw::Action action, std::string old_filename) override;
