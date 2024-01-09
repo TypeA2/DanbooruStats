@@ -4,9 +4,6 @@
 ## if default(error_message, false)
 <h3 style="color: red;">{{ error_message }}</h3>
 ## endif
-## if default(user_name, false)
-<h2>Queued processing for {{ user_name}} (<a href="https://danbooru.donmai.us/users/{{ user_id }}">user #{{ user_id }}</a>)</h2>
-## endif
 <form method="post">
     <h2>Enter user ID</h2>
     <input type="number" name="user_id" />

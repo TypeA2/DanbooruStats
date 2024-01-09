@@ -6,6 +6,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
+
 template <> struct fmt::formatter<nlohmann::json> {
     constexpr auto parse(format_parse_context& ctx) {
         return ctx.begin();
@@ -25,6 +27,24 @@ template <> struct fmt::formatter<nlohmann::json> {
             case binary:          return fmt::format_to(ctx.out(), "(binary)");
             case discarded:       return fmt::format_to(ctx.out(), "(discarded)");
         }
+    }
+};
+
+template <> struct fmt::formatter<std::chrono::nanoseconds> {
+    constexpr auto parse(format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const std::chrono::nanoseconds ns, format_context& ctx) const {
+        if (ns < std::chrono::microseconds(1)) {
+            return fmt::format_to(ctx.out(), "{} ns", ns.count());
+        } else if (ns < std::chrono::milliseconds(1)) {
+            return fmt::format_to(ctx.out(), "{:.3f} us", ns.count() / 1e3);
+        } else if (ns < std::chrono::seconds(1)) {
+            return fmt::format_to(ctx.out(), "{:.3f} ms", ns.count() / 1e6);
+        }
+
+        return fmt::format_to(ctx.out(), "{:.3f} s", ns.count() / 1e9);
     }
 };
 

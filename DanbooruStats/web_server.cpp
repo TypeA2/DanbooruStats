@@ -1,6 +1,8 @@
 #include "web_server.h"
 
 #include "danbooru.h"
+#include "database.h"
+#include "util.h"
 
 #include <magic_enum.hpp>
 #include <spdlog/spdlog.h>
@@ -11,11 +13,11 @@ web_server::~web_server() {
     _watcher.removeWatch(_watch_id);
 }
 
-web_server::web_server(danbooru& danbooru, const std::string& template_path, const std::string& static_path)
+web_server::web_server(danbooru& danbooru, database& db, const std::string& template_path, const std::string& static_path)
     : _template_path{ std::filesystem::canonical(template_path) }
     , _static_path{ std::filesystem::canonical(static_path) }
     , _inja{ template_path /* fs::canonical removes the trailing slash, breaking inja */ }
-    , _danbooru { danbooru } {
+    , _danbooru { danbooru }, _db { db } {
 
     spdlog::info("Loading templates from {}", _template_path.string());
 
@@ -64,9 +66,10 @@ web_server::web_server(danbooru& danbooru, const std::string& template_path, con
 
     /* Dynamic routing */
     
-    /*_server.Get(R"(/users/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {
-        this->users(std::stoll(req.matches[1]), req, res);
-    });*/
+    _server.Get(R"(/user/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {
+        this->user(std::stoll(req.matches[1]), req, res);
+    });
+
     _server.Get("/request", [this](const httplib::Request& req, httplib::Response& res) {
         this->request(req, res);
     });
@@ -81,11 +84,20 @@ void web_server::listen(const std::string& addr, uint16_t port) {
     _server.listen(addr, port);
 }
 
-void web_server::users(int64_t id, const httplib::Request& req, httplib::Response& res) {
-    const auto& tmpl = _ensure_template(template_id::users);
+void web_server::user(int64_t id, const httplib::Request& req, httplib::Response& res) {
+    const auto& tmpl = _ensure_template(template_id::user);
     inja::json data;
+    
+    
+    lazy_stats& stats = _db.stats_for(id);
 
     data["user_id"] = id;
+    data["posts"] = stats.posts().size();
+
+    data["unique_general_tags"] = stats.tag_count(tag_type::general).size();
+    data["unique_artists"] = stats.tag_count(tag_type::artist).size();
+    data["unique_characters"] = stats.tag_count(tag_type::character).size();
+    data["unique_copyrights"] = stats.tag_count(tag_type::copyright).size();
 
     res.set_content(_inja.render(tmpl, data), "text/html");
 }
@@ -119,11 +131,8 @@ void web_server::request_post(const httplib::Request& req, httplib::Response& re
 
     std::string user_name;
     if (_danbooru.user_exists(user_id, user_name)) {
-        spdlog::info("Queueing {} (user #{})", user_name, user_id);
-        request(req, res, {
-            { "user_name", user_name },
-            { "user_id", user_id }
-            });
+        spdlog::info("Looking up {} (user #{})", user_name, user_id);
+        res.set_redirect(std::format("/user/{}", user_id));
     } else {
         request(req, res, { { "error_message", "User does not exist" } });
     }

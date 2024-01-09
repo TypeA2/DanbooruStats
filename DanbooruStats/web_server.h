@@ -11,6 +11,7 @@
 #include <unordered_map>
 
 class danbooru;
+class database;
 class web_server : private efsw::FileWatchListener {
     httplib::Server _server;
     std::filesystem::path _template_path;
@@ -20,9 +21,10 @@ class web_server : private efsw::FileWatchListener {
     efsw::WatchID _watch_id;
 
     danbooru& _danbooru;
+    database& _db;
 
     enum class template_id {
-        users,
+        user,
         request,
     };
 
@@ -32,12 +34,12 @@ class web_server : private efsw::FileWatchListener {
     public:
     virtual ~web_server();
 
-    explicit web_server(danbooru& danbooru, const std::string& template_path = "./html/", const std::string& static_path = "./static/");
+    explicit web_server(danbooru& danbooru, database& db, const std::string& template_path = "./html/", const std::string& static_path = "./static/");
 
     void listen(const std::string& addr, uint16_t port);
 
     protected:
-    virtual void users(int64_t id, const httplib::Request& req, httplib::Response& res);
+    virtual void user(int64_t id, const httplib::Request& req, httplib::Response& res);
     virtual void request(const httplib::Request& req, httplib::Response& res, inja::json data = {});
     virtual void request_post(const httplib::Request& req, httplib::Response& res);
 
@@ -45,7 +47,7 @@ class web_server : private efsw::FileWatchListener {
     [[nodiscard]] static constexpr std::string_view template_filename(template_id id) {
         using enum template_id;
         switch (id) {
-            case users:   return "users.html";
+            case user:   return "user.html";
             case request: return "request.html";
             default: return ""; /* Shouldn't happen */
         }

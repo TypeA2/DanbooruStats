@@ -49,11 +49,11 @@ int main() {
 
 	load_dotenv();
 
-	danbooru danbooru{ std::getenv("DANBOORU_LOGIN"), std::getenv("DANBOORU_API_KEY") };
+	danbooru danbooru { std::getenv("DANBOORU_LOGIN"), std::getenv("DANBOORU_API_KEY") };
 
-	database db{ "DanbooruStats.db" };
+	database db { "data/2023.db" };
 
-	web_server server { danbooru };
+	web_server server { danbooru, db };
 
 	try {
 		server.listen("0.0.0.0", 26980);
