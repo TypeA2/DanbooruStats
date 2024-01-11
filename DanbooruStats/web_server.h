@@ -25,7 +25,7 @@ class web_server : private efsw::FileWatchListener {
 
     enum class template_id {
         user,
-        request,
+        tags,
     };
 
     std::unordered_map<template_id, inja::Template> _template_cache;
@@ -39,16 +39,15 @@ class web_server : private efsw::FileWatchListener {
     void listen(const std::string& addr, uint16_t port);
 
     protected:
-    virtual void user(int64_t id, const httplib::Request& req, httplib::Response& res);
-    virtual void request(const httplib::Request& req, httplib::Response& res, inja::json data = {});
-    virtual void request_post(const httplib::Request& req, httplib::Response& res);
+    virtual void user(int32_t id, const httplib::Request& req, httplib::Response& res);
+    virtual void tags(const std::string& category, const httplib::Request& req, httplib::Response& res);
 
     private:
     [[nodiscard]] static constexpr std::string_view template_filename(template_id id) {
         using enum template_id;
         switch (id) {
             case user:   return "user.html";
-            case request: return "request.html";
+            case tags: return "tags.html";
             default: return ""; /* Shouldn't happen */
         }
     }

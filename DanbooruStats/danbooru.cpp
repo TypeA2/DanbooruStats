@@ -17,11 +17,11 @@ danbooru::danbooru(std::string_view username, std::string_view api_key)
     }
 }
 
-bool danbooru::user_exists(uint64_t id) {
+bool danbooru::user_exists(int32_t id) {
     return _user_exists(id, nullptr);
 }
 
-bool danbooru::user_exists(uint64_t id, std::string& user_name) {
+bool danbooru::user_exists(int32_t id, std::string& user_name) {
     return _user_exists(id, &user_name);
 }
 
@@ -44,7 +44,7 @@ web_client::json danbooru::_get(const std::string& path, std::vector<web_client:
     return _client.get(path, params);
 }
 
-bool danbooru::_user_exists(uint64_t id, std::string* user_name) {
+bool danbooru::_user_exists(int32_t id, std::string* user_name) {
     /* Empty result if we just want to check existence */
     auto res = _get(std::format("/users/{}.json", id), { { "only", (user_name ? "name" : "") } });
 

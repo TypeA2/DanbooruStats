@@ -14,8 +14,8 @@ class danbooru {
     public:
     explicit danbooru(std::string_view username, std::string_view api_key);
 
-    [[nodiscard]] bool user_exists(uint64_t id);
-    [[nodiscard]] bool user_exists(uint64_t id, std::string& user_name);
+    [[nodiscard]] bool user_exists(int32_t id);
+    [[nodiscard]] bool user_exists(int32_t id, std::string& user_name);
 
     private:
     [[nodiscard]] bool _check_login();
@@ -23,7 +23,7 @@ class danbooru {
     /* Automatically insert API credentials */
     [[nodiscard]] web_client::json _get(const std::string& path, std::vector<web_client::parameter> params = {});
 
-    [[nodiscard]] bool _user_exists(uint64_t id, std::string* user_name);
+    [[nodiscard]] bool _user_exists(int32_t id, std::string* user_name);
 };
 
 #endif /* DANBOORU_H */

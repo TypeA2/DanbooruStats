@@ -1,13 +1,34 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
-#include <SQLiteCpp/SQLiteCpp.h>
 #include <magic_enum.hpp>
 #include <magic_enum_containers.hpp>
 
-#include <unordered_map>
 #include <array>
 #include <span>
+
+/* Use unordered set/map implmentations, may be faster */
+#define USE_UNORDERED 1
+
+#if USE_UNORDERED
+#include <unordered_map>
+#include <unordered_set>
+
+template <typename... Args>
+using db_map_type = std::unordered_map<Args...>;
+
+template <typename... Args>
+using db_set_type = std::unordered_set<Args...>;
+#else
+#include <map>
+#include <set>
+
+template <typename... Args>
+using db_map_type = std::map<Args...>;
+
+template <typename... Args>
+using db_set_type = std::set<Args...>;
+#endif
 
 enum class user_status {
     pending,
@@ -27,6 +48,10 @@ enum class tag_type {
 template <typename T>
 using tag_type_array = magic_enum::containers::array<tag_type, T>;
 
+using tag_count_map = db_map_type<std::string_view, int32_t>;
+
+using tag_count = std::pair<std::string_view, int32_t>;
+
 static constexpr auto create_tag_column_index() {
     tag_type_array<int> idx;
 
@@ -43,60 +68,57 @@ constexpr auto tag_column_index = create_tag_column_index();
 
 struct post {
     int32_t id;
+    int32_t uploader_id;
 
     tag_type_array<std::string> tags;
 };
 
 class database;
-class lazy_stats {
+class user_stats {
     public:
-    using tag_count_map = std::unordered_map<std::string_view, int32_t>;
-
     private:
     database& _db;
 
     int32_t _id;
 
-    std::vector<post> _posts;
+    std::vector<post*> _posts;
 
-    tag_type_array<std::optional<tag_count_map>> _tag_counts;
+    tag_type_array<tag_count_map> _tag_counts;
 
     public:
-    lazy_stats(const lazy_stats&) = delete;
-    lazy_stats& operator=(const lazy_stats&) = delete;
+    user_stats(const user_stats&) = delete;
+    user_stats& operator=(const user_stats&) = delete;
 
-    lazy_stats(lazy_stats&&) noexcept = default;
-    lazy_stats& operator=(lazy_stats&&) noexcept = default;
+    user_stats(user_stats&&) noexcept = default;
+    user_stats& operator=(user_stats&&) noexcept = default;
 
-    explicit lazy_stats(database& db, int32_t id, std::vector<post> posts);
+    explicit user_stats(database& db, int32_t id, std::vector<post*> posts);
 
-    /* Forcibly populate all stats */
-    void populate();
-
-    [[nodiscard]] std::span<const post> posts() const;
+    void add_post(post& post);
+    [[nodiscard]] std::span<post*> posts();
     [[nodiscard]] const tag_count_map& tag_count(tag_type type);
+
+    private:
+    /* Forcibly populate all stats */
+    void _populate();
+
 };
 
 class database {
-    SQLite::Database _db;
+    std::vector<post> _posts;
+    db_map_type<int32_t, user_stats> _stats;
 
-    std::unordered_map<int64_t, lazy_stats> _stats;
+    tag_type_array<tag_count_map> _tag_counts;
+    tag_type_array<std::vector<tag_count>> _tag_rankings;
 
     public:
     explicit database(const std::string& path);
 
     ~database();
 
-    [[nodiscard]] lazy_stats& stats_for(int32_t id);
-
-    private:
-
-    /* Prepared statements for query reuse */
-    enum class query {
-
-    };
-    
-    std::unordered_map<query, SQLite::Statement> _queries;
+    [[nodiscard]] user_stats& stats_for(int32_t id);
+    [[nodiscard]] const tag_count_map& tag_counts(tag_type type) const;
+    [[nodiscard]] std::span<const tag_count> tag_rankings(tag_type type) const;
 };
 
 #endif /* DATABASE_H */

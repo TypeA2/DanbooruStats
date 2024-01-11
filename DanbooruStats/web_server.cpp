@@ -8,6 +8,10 @@
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
+#include <queue>
+#include <chrono>
+
+using std::chrono::steady_clock;
 
 web_server::~web_server() {
     _watcher.removeWatch(_watch_id);
@@ -30,14 +34,14 @@ web_server::web_server(danbooru& danbooru, database& db, const std::string& temp
 
     _server.set_logger([](const httplib::Request& req, const httplib::Response& res) {
         if (req.has_header("Content-Type")) {
-            spdlog::info("[{}] {} - {} ({})", req.local_addr, req.method, req.path, res.get_header_value("Content-Type"));
+            spdlog::info("[{}] {} - {} ({})", req.remote_addr, req.method, req.path, res.get_header_value("Content-Type"));
         } else {
-            spdlog::info("[{}] {} - {}", req.local_addr, req.method, req.path);
+            spdlog::info("[{}] {} - {}", req.remote_addr, req.method, req.path);
         }
     });
 
     _server.set_exception_handler([](const httplib::Request& req, httplib::Response& res, std::exception_ptr ep) {
-        spdlog::error("[{}] {} - {}: {}", req.local_addr, req.method, req.path, "Exception:");
+        spdlog::error("[{}] {} - {}: {}", req.remote_addr, req.method, req.path, "Exception:");
 
         constexpr std::string_view fmt = "<h1>Error 500</h1><p>{}</p>";
         std::string body;
@@ -67,16 +71,13 @@ web_server::web_server(danbooru& danbooru, database& db, const std::string& temp
     /* Dynamic routing */
     
     _server.Get(R"(/user/(\d+))", [this](const httplib::Request& req, httplib::Response& res) {
-        this->user(std::stoll(req.matches[1]), req, res);
+        this->user(std::stoi(req.matches[1]), req, res);
     });
 
-    _server.Get("/request", [this](const httplib::Request& req, httplib::Response& res) {
-        this->request(req, res);
+    _server.Get("/tags/([a-z]+)", [this](const httplib::Request& req, httplib::Response& res) {
+        this->tags(req.matches[1], req, res);
     });
 
-    _server.Post("/request", [this](const httplib::Request& req, httplib::Response& res) {
-        this->request_post(req, res);
-    });
 }
 
 void web_server::listen(const std::string& addr, uint16_t port) {
@@ -84,60 +85,70 @@ void web_server::listen(const std::string& addr, uint16_t port) {
     _server.listen(addr, port);
 }
 
-void web_server::user(int64_t id, const httplib::Request& req, httplib::Response& res) {
-    const auto& tmpl = _ensure_template(template_id::user);
-    inja::json data;
-    
-    
-    lazy_stats& stats = _db.stats_for(id);
-
-    data["user_id"] = id;
-    data["posts"] = stats.posts().size();
-
-    data["unique_general_tags"] = stats.tag_count(tag_type::general).size();
-    data["unique_artists"] = stats.tag_count(tag_type::artist).size();
-    data["unique_characters"] = stats.tag_count(tag_type::character).size();
-    data["unique_copyrights"] = stats.tag_count(tag_type::copyright).size();
-
-    res.set_content(_inja.render(tmpl, data), "text/html");
-}
-
-void web_server::request(const httplib::Request& req, httplib::Response& res, inja::json data) {
-    const auto& tmpl = _ensure_template(template_id::request);
-    res.set_content(_inja.render(tmpl, data), "text/html");
-}
-
-void web_server::request_post(const httplib::Request& req, httplib::Response& res) {
-    inja::json data {
-        { "success", false }
-    };
-
-    if (!req.params.contains("user_id")) {
-        request(req, res, { { "error_message", "No user ID provider" } });
+void web_server::user(int32_t id, const httplib::Request& req, httplib::Response& res) {
+    std::string username;
+    if (!_danbooru.user_exists(id, username)) {
+        res.set_content("User does not exist", "text/html");
+        res.status = 404;
         return;
     }
 
-    std::string id = req.params.find("user_id")->second;
+    try {
+        const auto& tmpl = _ensure_template(template_id::user);
+        inja::json data;
 
-    /* Only digits */
-    for (char c : id) {
-        if (c < '0' || c > '9') {
-            request(req, res, { { "error_message", "User ID is not a number" } });
-            return;
-        }
+        user_stats& stats = _db.stats_for(id);
+
+        data["user_name"] = username;
+        data["user_id"] = id;
+        data["posts"] = stats.posts().size();
+
+        data["unique_general_tags"] = stats.tag_count(tag_type::general).size();
+        data["unique_artists"] = stats.tag_count(tag_type::artist).size();
+        data["unique_characters"] = stats.tag_count(tag_type::character).size();
+        data["unique_copyrights"] = stats.tag_count(tag_type::copyright).size();
+
+        res.set_content(_inja.render(tmpl, data), "text/html");
+    } catch (const std::out_of_range& e) {
+        spdlog::warn("user #{} not found: {}", id, e.what());
+        res.set_content(std::format("user #{} not found", id), "text/html");
+        res.status = 404;
     }
-
-    uint64_t user_id = std::stoull(id);
-
-    std::string user_name;
-    if (_danbooru.user_exists(user_id, user_name)) {
-        spdlog::info("Looking up {} (user #{})", user_name, user_id);
-        res.set_redirect(std::format("/user/{}", user_id));
-    } else {
-        request(req, res, { { "error_message", "User does not exist" } });
-    }
-
 }
+
+void web_server::tags(const std::string& category, const httplib::Request& req, httplib::Response& res) {
+    auto type = magic_enum::enum_cast<tag_type>(category);
+    if (!type.has_value()) {
+        res.set_content(std::format("category {} not found", category), "text/html");
+        res.status = 404;
+        return;
+    }
+
+    const auto& tmpl = _ensure_template(template_id::tags);
+
+    inja::json data;
+    data["tag_type"] = magic_enum::enum_name(type.value());
+
+    static constexpr size_t tag_count = 25;
+
+    data["tag_count"] = tag_count;
+
+    auto tags_array = inja::json::array();
+
+    const auto& counts = _db.tag_rankings(type.value());
+
+    data["total_count"] = counts.size();
+    
+    for (const auto& tag : counts | std::views::take(tag_count)) {
+
+        tags_array.push_back({ { "tag", tag.first }, { "count", tag.second } });
+    }
+
+    data["tags"] = tags_array;
+
+    res.set_content(_inja.render(tmpl, data), "text/html");
+}
+
 
 const inja::Template& web_server::_ensure_template(template_id id) {
     /* Return a template by it's ID, load it from a file if not already loaded */
