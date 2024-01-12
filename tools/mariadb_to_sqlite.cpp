@@ -117,16 +117,12 @@ int translate_sql(std::istream& in, std::ostream& out) {
         auto a = steady_clock::now();
 
         if (preamble || postamble) {
-            if (line.starts_with("LOCK") || line.starts_with("UNLOCK")) {
-                /* Comment lock/unlock */
+            if (line.starts_with("LOCK")) {
+                /* Comment LOCK */
                 out << "-- ";
                 bytes_written += 3;
 
-                if (preamble) {
-                    preamble = false;
-                } else if (!preamble && !postamble) {
-                    postamble = true;
-                }
+                preamble = false;
 
             } else if (line.starts_with(") ENGINE")) {
                 /* Engine and other specifiers are ignored */
@@ -137,11 +133,18 @@ int translate_sql(std::istream& in, std::ostream& out) {
                 /* Comment out KEY statements */
                 out << "-- ";
                 bytes_written += 3;
-            } else if (auto match = ctre::match<R"((\s+PRIMARY KEY.+),)">(line); match) {
+            } else if (auto match = ctre::match<R"(\s+PRIMARY KEY.+(,))">(line); match) {
                 /* Remove trailing comma from final PRIMARY KEY statement*/
-                out << match.get<1>();
-                bytes_written += match.get<1>().size();
+                //out << match.get<1>();
+                //bytes_written += match.get<1>().size();
+                *match.get<1>().begin() = ' ';
             }
+        } else if (line.starts_with("UNLOCK")) {
+            /* Comment UNLOCK */
+            out << "-- ";
+            bytes_written += 3;
+
+            postamble = true;
         }
 
         auto b = steady_clock::now();
