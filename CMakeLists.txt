@@ -13,3 +13,4 @@ project ("DanbooruStats")
 
 # Include sub-projects.
 add_subdirectory ("DanbooruStats")
+add_subdirectory ("tools")

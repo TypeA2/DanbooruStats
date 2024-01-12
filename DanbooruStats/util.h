@@ -35,7 +35,7 @@ template <> struct fmt::formatter<std::chrono::nanoseconds> {
         return ctx.begin();
     }
 
-    auto format(const std::chrono::nanoseconds ns, format_context& ctx) const {
+    auto format(const std::chrono::nanoseconds& ns, format_context& ctx) const {
         if (ns < std::chrono::microseconds(1)) {
             return fmt::format_to(ctx.out(), "{} ns", ns.count());
         } else if (ns < std::chrono::milliseconds(1)) {
