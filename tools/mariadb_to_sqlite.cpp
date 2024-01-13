@@ -38,7 +38,7 @@ template <> struct std::formatter<format_bytes> {
 
     auto format(const format_bytes& bytes, format_context& ctx) const {
         if (bytes.count < 1024) {
-            return std::format_to(ctx.out(), "{}", bytes.count);
+            return std::format_to(ctx.out(), "{} bytes", bytes.count);
         } else if (bytes.count < size_t { 1024 } * 1024) {
             return std::format_to(ctx.out(), "{:.3f} KiB", bytes.count / 1024.);
         } else if (bytes.count < size_t { 1024 } * 1024 * 1024) {
@@ -100,6 +100,7 @@ int translate_sql(std::istream& in, std::ostream& out) {
     size_t lines = 0;
     size_t bytes_read = 0;
     size_t bytes_written = 0;
+    size_t quotes_replaced = 0;
 
     std::chrono::nanoseconds sec1 { 0 };
     std::chrono::nanoseconds sec2 { 0 };
@@ -170,6 +171,7 @@ int translate_sql(std::istream& in, std::ostream& out) {
                 if (escape_next) {
                     /* If the escaped character is a single quote, fix the sequence */
                     if (*it == '\'') {
+                        ++quotes_replaced;
                         *(it - 1) = '\'';
                     }
 
@@ -202,6 +204,7 @@ int translate_sql(std::istream& in, std::ostream& out) {
 
     std::print(std::cerr, "Processed {} lines in {}:\n", lines, elapsed);
     std::print(std::cerr, "  {} {} {} {}\n", sec1, sec2, sec3, sec4);
+    std::print(std::cerr, "Replaced {} quotes\n", quotes_replaced);
     std::print(std::cerr, "Read {} ({}/s), wrote {} ({}/s)\n",
         format_bytes { bytes_read }, format_bytes { read_per_second },
         format_bytes { bytes_written }, format_bytes { write_per_second });
