@@ -1,4 +1,4 @@
-﻿add_executable (DanbooruStats "main.cpp"  "web_server.h" "database.h" "database.cpp" "web_server.cpp" "danbooru.h" "danbooru.cpp" "rate_limit.h" "rate_limit.cpp" "web_client.h" "web_client.cpp" "util.h")
+﻿add_executable (DanbooruStats "main.cpp"  "web_server.h" "database.h" "database.cpp" "web_server.cpp" "danbooru.h" "danbooru.cpp" "rate_limit.h" "rate_limit.cpp" "web_client.h" "web_client.cpp" "util.h" )
 
 target_compile_definitions(DanbooruStats PRIVATE _CRT_SECURE_NO_WARNINGS)
 

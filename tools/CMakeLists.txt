@@ -34,3 +34,20 @@ endif()
 
 find_package(SQLiteCpp CONFIG REQUIRED)
 target_link_libraries(database_dump PRIVATE SQLiteCpp)
+
+add_executable (fast_forward_posts "fast_forward_posts.cpp")
+
+target_compile_definitions(fast_forward_posts PRIVATE _CRT_SECURE_NO_WARNINGS)
+
+set_target_properties(fast_forward_posts PROPERTIES
+	CXX_STANDARD 23
+	CXX_STANDARD_REQUIRED ON
+)
+
+if (MSVC)
+	target_compile_options(fast_forward_posts PRIVATE /W3)
+else()
+	target_compile_options(fast_forward_posts PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+target_link_libraries(fast_forward_posts PRIVATE SQLiteCpp)
