@@ -13,7 +13,7 @@
 #include <ranges>
 #include <concepts>
 
-#include "progressbar.hpp"
+#include <tqdm/tqdm.h>
 
 #include <SQLiteCpp/SQLiteCpp.h>
 
@@ -158,7 +158,20 @@ struct posts_database {
         }
     };
 
-    std::unordered_map<std::string, uint32_t, string_hasher, range_eq> tags;
+    enum class tag_type {
+        artist,
+        copyright,
+        character,
+        general,
+        meta
+    };
+
+    struct tag {
+        uint32_t id;
+        tag_type type;
+    };
+
+    std::unordered_map<std::string, tag, string_hasher, range_eq> tags;
     std::vector<post> posts;
     size_t total_tags = 0;
 
@@ -171,8 +184,12 @@ struct posts_database {
 
         SQLite::Statement query { db, "SELECT * FROM posts" };
 
-        progressbar progress(post_count / 10000);
-        progress.set_done_char("█");
+        //progressbar progress(post_count / 10000);
+        //progress.set_done_char("█");
+
+        tqdm::Tqdm progress = tqdm::tqdm(nullptr, post_count);
+
+        auto it = progress.begin();
 
         size_t i = 0;
 
@@ -221,9 +238,7 @@ struct posts_database {
 
             posts.emplace_back(std::move(post));
 
-            if (i % 10000 == 0) {
-                progress.update();
-            }
+            ++it;
 
             ++i;
         }
@@ -263,7 +278,7 @@ struct posts_database {
     private:
     uint32_t _current_tag = 0;
 
-    [[nodiscard]] tag_set split_tags(std::string_view string, uint16_t reserve = 0) {
+    [[nodiscard]] tag_set split_tags(std::string_view string, /*tag_type type, */ uint16_t reserve = 0) {
         tag_set result;
         result.reserve(reserve);
 

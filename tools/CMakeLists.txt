@@ -51,3 +51,36 @@ else()
 endif()
 
 target_link_libraries(fast_forward_posts PRIVATE SQLiteCpp)
+
+target_include_directories(fast_forward_posts PRIVATE "${PROJECT_SOURCE_DIR}/lib/tqdm-cpp")
+
+add_executable (fetch_tags "fetch_tags.cpp")
+
+target_compile_definitions(fetch_tags PRIVATE _CRT_SECURE_NO_WARNINGS)
+
+set_target_properties(fetch_tags PROPERTIES
+	CXX_STANDARD 23
+	CXX_STANDARD_REQUIRED ON
+)
+
+if (MSVC)
+	target_compile_options(fetch_tags PRIVATE /W3)
+else()
+	target_compile_options(fetch_tags PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+target_link_libraries(fetch_tags PRIVATE SQLiteCpp)
+
+target_include_directories(fetch_tags PRIVATE "${PROJECT_SOURCE_DIR}/lib/tqdm-cpp")
+
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(fetch_tags PRIVATE nlohmann_json::nlohmann_json)
+
+find_package(magic_enum CONFIG REQUIRED)
+target_link_libraries(fetch_tags PRIVATE magic_enum::magic_enum)
+
+find_package(OpenSSL REQUIRED)
+target_link_libraries(fetch_tags PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+
+find_package(httplib CONFIG REQUIRED)
+target_link_libraries(fetch_tags PRIVATE httplib::httplib)
